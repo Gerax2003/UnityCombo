@@ -25,9 +25,6 @@ public class IKSolver : MonoBehaviour
     [SerializeField]
     bool useAngleLimit = true;
 
-    [SerializeField]
-    bool stableAngleLimit = false;
-
     Bone lastBone;
     Bone firstBone;
 
@@ -60,7 +57,6 @@ public class IKSolver : MonoBehaviour
         statsText.text = "Type: " + type.ToString() + "\n"
             + "Length: " + chainLen + "\n"
             + "Angle limit: " + useAngleLimit.ToString() + "\n"
-            + "Stable limiter: " + stableAngleLimit.ToString() + "\n"
             + "Axis constraints: " + useConstraints.ToString() + "\n";
 
         Stopwatch stopwatch = new Stopwatch();
@@ -223,24 +219,14 @@ public class IKSolver : MonoBehaviour
             if (useAngleLimit)
             {
 
-                // Bloated implementation but very stable, used for benchmark performance and quality of other implementations, taken from:
-                // https://github.com/zalo/MathUtilities/blob/master/Assets/Constraints/Constraints.cs | https://github.com/zalo/MathUtilities/blob/master/Assets/IK/CCDIK/CCDIKJoint.cs
-                // !! Only takes max angle into account, needs a positive max! !!
-                if (stableAngleLimit)
-                {
-                    // Find compensating rotation and apply it to unclamped rotation
-                    bone.transform.rotation = CCDAngleStableImpl(bone);
-                }
-                else // just clamp the rotation quaternion's angle around its own axis
-                     // Known instabilities: stutters on spawn/fast movement, inability to solve then teleportation and reverse joints if range does not cross 0
-                {
-                    Quaternion clampRotation = ClampRotation(bone.transform.localRotation, bone.jointMinLimits, bone.jointMaxLimits);
-                    bone.transform.localRotation = clampRotation;
-                }
+                // just clamp the rotation quaternion's angle around its own axis
+                // Known instabilities: stutters on spawn/fast movement, inability to solve then teleportation and reverse joints if range does not cross 0
+                Quaternion clampRotation = ClampRotation(bone.transform.localRotation, bone.jointMinLimits, bone.jointMaxLimits);
+                bone.transform.localRotation = clampRotation;
 
-                constraintStopwatch.Stop();
-                totalConstraintTime += constraintStopwatch.Elapsed.TotalMilliseconds;
             }
+            constraintStopwatch.Stop();
+            totalConstraintTime += constraintStopwatch.Elapsed.TotalMilliseconds;
         }
     }
 
@@ -278,23 +264,13 @@ public class IKSolver : MonoBehaviour
 
             if (useAngleLimit)
             {
-                // Bloated implementation but very stable, used for benchmark performance and quality of other implementations, taken from:
-                // https://github.com/zalo/MathUtilities/blob/master/Assets/Constraints/Constraints.cs | https://github.com/zalo/MathUtilities/blob/master/Assets/IK/CCDIK/CCDIKJoint.cs
-                // !! Only takes max angle into account, needs a positive max! !!
-                if (stableAngleLimit)
-                {
-                    // Find compensating rotation and apply it to unclamped rotation
-                    bone.transform.rotation = CCDAngleStableImpl(bone);
-                }
-                else // just clamp the rotation quaternion's angle around its own axis
-                {
-                    Quaternion clampRotation = ClampRotation(bone.transform.localRotation, bone.jointMinLimits, bone.jointMaxLimits);
-                    bone.transform.localRotation = clampRotation;
-                }
-
-                constraintStopwatch.Stop();
-                totalConstraintTime += constraintStopwatch.Elapsed.TotalMilliseconds;
+                // just clamp the rotation quaternion's angle around its own axis
+                Quaternion clampRotation = ClampRotation(bone.transform.localRotation, bone.jointMinLimits, bone.jointMaxLimits);
+                bone.transform.localRotation = clampRotation;
             }
+
+            constraintStopwatch.Stop();
+            totalConstraintTime += constraintStopwatch.Elapsed.TotalMilliseconds;
         }
     }
 
@@ -310,42 +286,6 @@ public class IKSolver : MonoBehaviour
         }
 
         return length;
-    }
-    #endregion
-
-    #region CCD STABLE
-    // Bloated implementation but very stable, used for benchmark performance and quality of other implementations, taken from:
-    // https://github.com/zalo/MathUtilities/blob/master/Assets/Constraints/Constraints.cs | https://github.com/zalo/MathUtilities/blob/master/Assets/IK/CCDIK/CCDIKJoint.cs
-    // !! Only takes max angle into account, needs a positive max! !!
-    Quaternion CCDAngleStableImpl(Bone bone)
-    {
-        Quaternion rot = bone.transform.rotation;
-        Quaternion parentRot = bone.parentBone != null ? bone.parentBone.transform.rotation : Quaternion.identity;
-        // basically the joint's forwards?
-        Vector3 perpendicular = Perpendicular(bone.jointAxis);
-        // Find the vector that represents the clamped rotation(?) using current direction and parent's direction (????)
-        Vector3 constraintVector = ConstrainToNormal(rot * perpendicular, parentRot * perpendicular, bone.jointMaxLimits);
-        // Find compensating rotation to apply to unclamped rotation
-        return Quaternion.FromToRotation(rot * perpendicular, constraintVector) * rot;
-    }
-
-    // used by stable implementation, not mine
-    public Vector3 Perpendicular(Vector3 vec)
-    {
-        return Mathf.Abs(vec.x) > Mathf.Abs(vec.z) ? new Vector3(-vec.y, vec.x, 0f)
-                                                   : new Vector3(0f, -vec.z, vec.y);
-    }
-    // used by stable implementation, not mine
-    public Vector3 ConstrainToNormal(Vector3 direction, Vector3 normalDirection, float maxAngle)
-    {
-        if (maxAngle <= 0f) return normalDirection.normalized * direction.magnitude; if (maxAngle >= 180f) return direction;
-
-        float dot = Mathf.Clamp(Vector3.Dot(direction.normalized, normalDirection.normalized), -1f, 1f);
-        float angle = Mathf.Acos(dot) * Mathf.Rad2Deg;
-
-        // direction represents the vector without a rotation, normalDirection the maximum and "(angle - maxAngle) / angle" calculates the clamp??
-        Vector3 ret = Vector3.Slerp(direction.normalized, normalDirection.normalized, (angle - maxAngle) / angle);
-        return ret * direction.magnitude;
     }
     #endregion
 

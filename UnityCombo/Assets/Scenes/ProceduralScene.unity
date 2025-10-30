@@ -777,7 +777,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rangeMin: 0
   rangeMax: 1000
-  iterations: 1
+  iterations: 1000
   fRangeMin: 0
   fRangeMax: 100
 --- !u!4 &994336716
